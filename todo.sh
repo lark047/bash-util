@@ -14,11 +14,11 @@ todo()
 
         mark)
             shift
-            if grep "$*" ~/.todo; then
+            if grep -v "^COMPLETED" ~/.todo | grep "$*"; then
                 read -rp "Mark these notes completed? [Y/N] " response
                 case ${response,,} in
                     yes|y)
-                        sed -i "/$*/s/^/COMPLETED /" ~/.todo
+                        sed -i "/^[0-9].*$*/s/^/COMPLETED /" ~/.todo
                         ;;
                 esac
             fi
