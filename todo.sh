@@ -18,7 +18,7 @@ todo()
                 read -rp "Mark these notes completed? [Y/N] " response
                 case ${response,,} in
                     yes|y)
-                        sed -i "/^[0-9].*$*/s/^/COMPLETED /" ~/.todo
+                        sed -i "/^[0-9].*$*/s/^\(.*\)/COMPLETED \1 $(date +%s)/" ~/.todo
                         ;;
                 esac
             fi
