@@ -96,7 +96,8 @@ pass()
                 read -rp '>> password? ' password
                 decrypt "${passphrase}" "${password_file}" | grep -v "^${key}," > ${outfile}
                 echo "${key},${password}" >> ${outfile}
-                encrypt "${passphrase}" "${outfile}"
+                encrypt "${passphrase}" "${outfile}" && \
+                    printf 'Added R:%s, A:%s\n' "${resource:-(none)}" "${account}"
                 ;;
             d|debug) set -x ;;
             c|config)
