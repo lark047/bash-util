@@ -64,8 +64,11 @@ pass()
                 passphrase="$(get_passphrase)"
                 echo
 
+                declare index=3
+                [[ "${searchfor}" = *,* ]] || (( --index ))
+
                 set -o pipefail
-                decrypt "${passphrase}" | grep "^${searchfor}," | cut -d, -f3- | sed 's/^,//' || \
+                decrypt "${passphrase}" | grep "^${searchfor}," | cut -d, -f${index}- | sed 's/^,//; s/,/: /' || \
                     printf 'Password not found! (R:%s, A:%s)\n' "${resource:-(none)}" "${account}"
                 set +o pipefail
                 ;;
