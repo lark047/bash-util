@@ -82,9 +82,9 @@ pass()
                 }
 
                 declare outfile key password
-                key="${resource},${account},"
+                key="${resource},${account}"
                 key="${key##,}"
-                [[ -z "${key//,}" ]] && {
+                [[ -z "${key}" ]] && {
                     usage
                     return 1
                 }
@@ -94,7 +94,7 @@ pass()
                 echo
 
                 read -rp '>> password? ' password
-                decrypt "${passphrase}" "${password_file}" | grep -v "^${key}" > ${outfile}
+                decrypt "${passphrase}" "${password_file}" | grep -v "^${key}," > ${outfile}
                 echo "${key},${password}" >> ${outfile}
                 encrypt "${passphrase}" "${outfile}"
                 ;;
