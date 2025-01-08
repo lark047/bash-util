@@ -9,9 +9,10 @@
 #export 'PS4=+${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}():'
 
 gpg_bin="$(command -v gpg)"
-[[ -z "${gpg_bin}" ]] && {
-    printf 'Installing GPG...\n'
-    apt-get install gpg
+openssl_bin="$(command -v openssl)"
+[[ -z "${gpg_bin}${openssl_bin}" ]] && {
+    printf 'Install either GPG or OpenSSL to use pass...\n'
+    return 1
 }
 
 password_file=~/.pass/passwords
