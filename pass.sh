@@ -15,9 +15,12 @@ gpg_bin="$(command -v gpg)"
 }
 
 password_file=~/.pass/passwords
+password_conf=~/.pass/pass.conf
+
 [[ -d $(dirname ${password_file}) ]] || mkdir ~/.pass
 [[ -f ${password_file} ]] || touch ${password_file}
-chmod 600 ${password_file}
+[[ -f ${password_conf} ]] || touch ${password_conf}
+chmod 600 ${password_file} ${password_conf}
 
 pass()
 {
@@ -26,6 +29,7 @@ pass()
         case "${arg}" in
             g|get|r|read) action='get'; break ;;
             u|update) action='update'; break ;;
+            c|config) action='configure'; break ;;
         esac
     done
 
@@ -34,12 +38,9 @@ pass()
         return 1
     }
 
+    declare passphrase
     declare resource
     declare account
-
-    declare passphrase
-    read -srp '>> passphrase? ' passphrase
-    echo
 
     while (( $# )); do
         case "${1//-}" in
@@ -51,6 +52,7 @@ pass()
                     resource="${account}"
                     account="${1}"
                 }
+
                 declare searchfor
                 [[ -z "${resource}" ]] || searchfor="${resource},"
                 searchfor="${searchfor}${account}"
@@ -58,6 +60,10 @@ pass()
                     usage
                     return 1
                 }
+
+                passphrase="$(get_passphrase)"
+                echo
+
                 set -o pipefail
                 decrypt "${passphrase}" | grep "^${searchfor}," | cut -d, -f3- | sed 's/^,//' || \
                     printf 'Password not found! (R:%s, A:%s)\n' "${resource:-(none)}" "${account}"
@@ -71,6 +77,7 @@ pass()
                     resource="${account}"
                     account="${1}"
                 }
+
                 declare outfile key password
                 key="${resource},${account},"
                 key="${key##,}"
@@ -78,13 +85,44 @@ pass()
                     usage
                     return 1
                 }
+
                 outfile=$(mktemp)
+                passphrase="$(get_passphrase)"
+                echo
+
                 read -rp '>> password? ' password
                 decrypt "${passphrase}" "${password_file}" | grep -v "^${key}" > ${outfile}
                 echo "${key},${password}" >> ${outfile}
                 encrypt "${passphrase}" "${outfile}"
                 ;;
             d|debug) set -x ;;
+            c|config)
+                shift
+                case "${1}" in
+                    get-*)
+                        declare key="${1#*-}"
+                        grep -q "^${key} = " ${password_conf} 2>/dev/null || {
+                            printf '%s not configured. Use "pass config set-%s <value>" to set.\n' "${key^}" "${key}"
+                            return 0
+                        }
+                        printf '%s %s\n' "${key}" "$(awk -F'=' "/^${key}/ {print \$NF}" ${password_conf})"
+                        ;;
+                    set-*)
+                        declare key=${1#*-} value="${2}"
+                        [[ -z "${value}" ]] && {
+                            printf 'Missing value for set-%s\n' "${key}"
+                            return 1
+                        }
+                        { [[ "${key}" = 'encryption' ]] && [[ -s ${password_file} ]]; } && {
+                            printf 'Cannot change encryption (password file: %d bytes)\n' "$(stat -c %s ${password_file})"
+                            return 1
+                        }
+                        sed -i "/^${key}/d" ${password_conf}
+                        echo "${key} = ${value}" >> ${password_conf}
+                        printf 'Set %s to "%s"\n' "${key}" "${value}"
+                        ;;
+                esac
+                ;;
             *)
                 usage
                 return 1
@@ -143,6 +181,13 @@ encrypt()
         { echo "${passphrase}"; echo "${passphrase}"; } | ${gpg_bin} --yes --batch --passphrase-fd 0 --symmetric --output ${password_file} ${plaintext}
         release_lock
     fi
+}
+
+get_passphrase()
+{
+    declare passphrase
+    read -srp '>> passphrase? ' passphrase
+    echo "${passphrase}"
 }
 
 trap 'release_lock 1' EXIT
