@@ -15,7 +15,7 @@ openssl_bin="$(command -v openssl)"
 password_file=~/.pass/passwords
 password_conf=~/.pass/pass.conf
 
-[[ -d $(dirname ${password_file}) ]] || mkdir ~/.pass
+[[ -d $(dirname ${password_file}) ]] || mkdir ${password_file}
 [[ -f ${password_file} ]] || touch ${password_file}
 [[ -f ${password_conf} ]] || touch ${password_conf}
 chmod 600 ${password_file} ${password_conf}
