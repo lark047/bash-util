@@ -1,9 +1,6 @@
 #!/bin/bash
 
 # todo: list
-# todo: what should the behavior be if just passing a resource?
-#       right now get() prints all passwords for the resource
-# todo: use openssl if gpg isn't available (default to openssl?)
 # todo: save passphrase? not recommended
 
 #export 'PS4=+${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]}():'
@@ -31,6 +28,7 @@ pass()
             g|get|r|read) action='get'; break ;;
             u|update) action='update'; break ;;
             c|config) action='configure'; break ;;
+            d|delete) action='delete'; break ;;
         esac
     done
 
@@ -100,7 +98,28 @@ pass()
                 encrypt "${passphrase}" "${outfile}" && \
                     printf 'Added R:%s, A:%s\n' "${resource:-(none)}" "${account}"
                 ;;
-            d|debug) set -x ;;
+            x|debug) set -x ;;
+            d|delete)
+                shift
+                [[ -z "${1}" ]] || account="${1}"
+                [[ -z "${2}" ]] || {
+                    shift
+                    resource="${account}"
+                    account="${1}"
+                }
+
+                declare searchfor
+                [[ -z "${resource}" ]] || searchfor="${resource},"
+                searchfor="${searchfor}${account}"
+                [[ -z "${searchfor}" ]] && {
+                    usage
+                    return 1
+                }
+
+                decrypt "${passphrase}" "${password_file}" | grep -v "^${searchfor}," > ${outfile}
+                encrypt "${passphrase}" "${outfile}" && \
+                    printf 'Deleted R:%s, A:%s\n' "${searchfor%,*}" "${account:-(all)}"
+                ;;
             c|config)
                 shift
                 case "${1}" in
