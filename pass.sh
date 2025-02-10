@@ -93,8 +93,8 @@ pass()
                 echo
 
                 read -rp '>> password? ' password
-                decrypt "${passphrase}" "${password_file}" | grep -v "^${key}," > ${outfile}
-                echo "${key},${password}" >> ${outfile}
+                decrypt "${passphrase}" "${password_file}" | grep -v "^${key}," > "${outfile}"
+                echo "${key},${password}" >> "${outfile}"
                 encrypt "${passphrase}" "${outfile}" && \
                     printf 'Added R:%s, A:%s\n' "${resource:-(none)}" "${account}"
                 ;;
@@ -129,7 +129,7 @@ pass()
                             printf '%s not configured. Use "pass config set-%s <value>" to set.\n' "${key^}" "${key}"
                             return 0
                         }
-                        printf '%s %s\n' "${key}" "$(awk -F'=' "/^${key}/ {print \$NF}" ${password_conf})"
+                        printf '%s %s\n' "${key^}" "$(awk -F' = ' "/^${key}/ {print \$NF}" ${password_conf})"
                         ;;
                     set-*)
                         declare key=${1#*-} value="${2}"
@@ -144,6 +144,7 @@ pass()
                         sed -i "/^${key}/d" ${password_conf}
                         echo "${key} = ${value}" >> ${password_conf}
                         printf 'Set %s to "%s"\n' "${key}" "${value}"
+                        shift
                         ;;
                 esac
                 ;;
@@ -165,6 +166,12 @@ usage()
     printf '\tgets the password for network resource, home-15 account ("retrieve" is a synonym)\n'
     printf 'pass update internet apple "password123"\n'
     printf '\tadd the password "password123" to the internet resource, apple account\n\n'
+    printf 'pass config get-<key>\n'
+    printf '\tgets the current value of <key> from the config file\n'
+    printf 'pass config set-<key> <value>\n'
+    printf '\tadds <key> = <value> to the config\n'
+    # todo
+    printf '\n'
     printf 'g, r, and u are synonyms for get, retrieve, and update, respectively\n'
 }
 
@@ -190,19 +197,33 @@ release_lock()
 
 decrypt()
 {
+    method="$(get_encryption)" || {
+        printf "%s\n" "${method}"
+        return 1
+    }
     if acquire_lock 'read'; then
         declare passphrase="${1}"
-        echo "${passphrase}" | ${gpg_bin} --yes --batch --passphrase-fd 0 --decrypt ${password_file} 2>/dev/null
+        case "${method}" in
+            gpg) echo "${passphrase}" | ${gpg_bin} --yes --batch --passphrase-fd 0 --decrypt ${password_file} 2>/dev/null ;;
+            openssl) ${openssl_bin} enc -d -aes-256-cbc -md sha512 -pbkdf2 -in ${password_file} -k "${passphrase}" ;;
+        esac
         release_lock
     fi
 }
 
 encrypt()
 {
+    method="$(get_encryption)" || {
+        printf "%s\n" "${method}"
+        return 1
+    }
     if acquire_lock 'write'; then
         declare passphrase="${1}"
         declare plaintext="${2}"
-        { echo "${passphrase}"; echo "${passphrase}"; } | ${gpg_bin} --yes --batch --passphrase-fd 0 --symmetric --output ${password_file} ${plaintext}
+        case "${method}" in
+            gpg) { echo "${passphrase}"; echo "${passphrase}"; } | ${gpg_bin} --yes --batch --passphrase-fd 0 --symmetric --output ${password_file} "${plaintext}" ;;
+            openssl) ${openssl_bin} enc -aes-256-cbc -md sha512 -pbkdf2 -in "${plaintext}" -k "${passphrase}" -out ${password_file} ;;
+        esac
         release_lock
     fi
 }
@@ -212,6 +233,16 @@ get_passphrase()
     declare passphrase
     read -srp '>> passphrase? ' passphrase
     echo "${passphrase}"
+}
+
+get_encryption()
+{
+    method="$(awk -F' = ' '/^encryption = / {print $NF}' ${password_conf})"
+    [[ -z "${method}" ]] && {
+        printf 'Encryption method not configured! Please set with "pass config set-encryption <method>".\n'
+        return 1
+    }
+    echo "${method}"
 }
 
 trap 'release_lock 1' EXIT
