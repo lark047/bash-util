@@ -185,14 +185,18 @@ acquire_lock()
     esac
 
     eval "exec ${fd}>/tmp/pass.lock"
+    echo $$ >> /tmp/pass.lock
     flock -${type:-s} -w 3 ${fd}
 }
 
 release_lock()
 {
     [[ "${1}" -eq 1 ]] && echo
-    declare -i fd=7
-    flock -u ${fd}
+    grep -q $$ /tmp/pass.lock && {
+        declare -i fd=7
+        flock -u ${fd}
+        sed -i "/$$/d" /tmp/pass.lock
+    }
 }
 
 decrypt()
