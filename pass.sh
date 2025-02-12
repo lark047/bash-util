@@ -26,7 +26,7 @@ pass()
     for arg in "$@"; do
         case "${arg}" in
             g|get|r|read) action='get'; break ;;
-            u|update) action='update'; break ;;
+            a|add|u|update) action='update'; break ;;
             c|config) action='configure'; break ;;
             d|delete) action='delete'; break ;;
         esac
@@ -71,7 +71,7 @@ pass()
                     printf 'Password not found! (R:%s, A:%s)\n' "${resource:-(none)}" "${account}"
                 set +o pipefail
                 ;;
-            u|update)
+            a|add|u|update)
                 shift
                 [[ -z "${1}" ]] || account="${1}"
                 [[ -z "${2}" ]] || {
