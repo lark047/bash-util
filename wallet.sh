@@ -5,24 +5,32 @@ wallet()
     declare wdir=~/.wallet
     [[ -d ${wdir} ]] || mkdir ${wdir}
     [[ -r ${wdir}/index ]] || touch ${wdir}/index
+
     case "${1//-}" in
         a|add)
             shift
-            declare id name number expires cvv wfile
+            declare id="${1}" name number expires cvv wfile
             read -rp 'Name on card: ' name
             read -rp 'Number: ' number
             read -rp 'Expiration Date (YYYY-DD-MM): ' expires
             read -rp 'CVV: ' cvv
-            [[ -z "${1}" ]]  || id="${1}"
             [[ -z "${id}" ]] && id="${number##*-}"
-            # todo: decrypt index
-            grep -q "${id}" ${wdir}/index && {
+
+            read -rp '>> passphrase? ' passphrase
+            declare tmpfile="$(mktemp -p ${wdir})"
+            [[ -s ${wdir}/index ]] && \
+                openssl enc -d -aes-256-cbc -md sha512 -pbkdf2 -in ${wdir}/index -k "${passphrase}" -out ${tmpfile}
+
+            grep -q "${id}" ${tmpfile} && {
                 printf 'Refusing to overwrite existing entry\n' >&2
                 return 1
             }
+
             wfile="$(mktemp -p ${wdir} secret.XXXXXXX)"
-            echo "${id},${wfile##*/}" >> ${wdir}/index
-            # todo: encrypt index
+            echo "${id},${wfile##*/}" >> ${tmpfile}
+            openssl enc -aes-256-cbc -md sha512 -pbkdf2 -in ${tmpfile} -k "${passphrase}" -out ${wdir}/index && \
+                rm ${tmpfile}
+
             echo "{
     \"id\": \"${id}\",
     \"name\": \"${name}\",
